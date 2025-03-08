@@ -1,7 +1,7 @@
 {
   "name": "expense-tracker",
   "version": "0.1.0",
-  "homepage": "https://<Username>.github.io/<Repository-name>",
+  "homepage": "https://PiyushY111.github.io/Expense-Tracker/",
   "private": true,
   "dependencies": {
     "@reduxjs/toolkit": "^2.4.0",
