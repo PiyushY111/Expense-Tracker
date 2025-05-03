@@ -10,7 +10,7 @@ const ExpenseList = ({ expenses, onRemoveExpense, onUpdateExpense }) => {
   const handleDelete = (id) => {
     onRemoveExpense(id);
   };
-  
+
 
   const handleEdit = (expense) => {
     setEditableExpense(expense.id);
@@ -20,6 +20,7 @@ const ExpenseList = ({ expenses, onRemoveExpense, onUpdateExpense }) => {
     setUpdatedDate(expense.date.split('T')[0]);
   };
 
+  
   const handleSave = (id) => {
     const updatedExpense = {
       id,
