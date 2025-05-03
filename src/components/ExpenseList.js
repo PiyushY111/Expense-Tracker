@@ -10,6 +10,7 @@ const ExpenseList = ({ expenses, onRemoveExpense, onUpdateExpense }) => {
   const handleDelete = (id) => {
     onRemoveExpense(id);
   };
+  
 
   const handleEdit = (expense) => {
     setEditableExpense(expense.id);
