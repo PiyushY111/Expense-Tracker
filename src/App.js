@@ -181,6 +181,7 @@ function AppContent() {
               />
             </div>
           </div>
+          
         </main>
         <footer className="relative z-10 bg-white/10 backdrop-blur-2xl rounded-2xl shadow-xl border border-white/20 px-8 py-4 mt-12">
           <p className="text-center text-indigo-200">
