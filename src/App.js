@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
 import Login from './components/Login';
 import ExpenseForm from './components/ExpenseForm';
 import ExpenseList from './components/ExpenseList';
@@ -9,143 +7,109 @@ import CategoryManager from './components/CategoryManager';
 import ExpenseFilter from './components/ExpenseFilter';
 import ExpenseAnalytics from './components/ExpenseAnalytics';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-blue-900 to-violet-800">
+          <div className="bg-white/10 backdrop-blur-2xl rounded-2xl p-8 max-w-lg w-full mx-4">
+            <h1 className="text-2xl font-bold text-white mb-4">Something went wrong</h1>
+            <p className="text-red-200 mb-4">{this.state.error?.toString()}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function AppContent() {
   const { currentUser, logout } = useAuth();
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [filteredExpenses, setFilteredExpenses] = useState([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
+  // Load data from localStorage on component mount
   useEffect(() => {
-    if (!currentUser) {
-      setLoading(false);
-      return;
-    }
-
-    // Load user data from Firestore
-    const loadUserData = async () => {
-      try {
-        const userRef = doc(db, 'users', currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          setExpenses(userData.expenses || []);
-          setCategories(userData.categories || []);
-          setFilteredExpenses(userData.expenses || []);
-        }
-      } catch (error) {
-        console.error('Error loading user data:', error);
-      } finally {
-        setLoading(false);
+    if (currentUser) {
+      const savedExpenses = localStorage.getItem(`expenses_${currentUser.uid}`);
+      const savedCategories = localStorage.getItem(`categories_${currentUser.uid}`);
+      
+      if (savedExpenses) {
+        setExpenses(JSON.parse(savedExpenses));
+        setFilteredExpenses(JSON.parse(savedExpenses));
       }
-    };
-
-    loadUserData();
-
-    // Subscribe to real-time updates
-    const expensesQuery = query(
-      collection(db, 'expenses'),
-      where('userId', '==', currentUser.uid)
-    );
-
-    const unsubscribeExpenses = onSnapshot(expensesQuery, (snapshot) => {
-      const expensesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setExpenses(expensesData);
-      setFilteredExpenses(expensesData);
-    });
-
-    const categoriesQuery = query(
-      collection(db, 'categories'),
-      where('userId', '==', currentUser.uid)
-    );
-
-    const unsubscribeCategories = onSnapshot(categoriesQuery, (snapshot) => {
-      const categoriesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setCategories(categoriesData);
-    });
-
-    return () => {
-      unsubscribeExpenses();
-      unsubscribeCategories();
-    };
+      
+      if (savedCategories) {
+        setCategories(JSON.parse(savedCategories));
+      }
+    }
   }, [currentUser]);
 
-  const handleAddExpense = async (expense) => {
-    try {
-      const expenseData = {
-        ...expense,
-        userId: currentUser.uid,
-        createdAt: new Date().toISOString()
-      };
-      
-      // Add to Firestore
-      const docRef = await addDoc(collection(db, 'expenses'), expenseData);
-      
-      // Update local state
-      setExpenses(prev => [...prev, { id: docRef.id, ...expenseData }]);
-      setFilteredExpenses(prev => [...prev, { id: docRef.id, ...expenseData }]);
-    } catch (error) {
-      console.error('Error adding expense:', error);
+  // Save data to localStorage whenever it changes
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem(`expenses_${currentUser.uid}`, JSON.stringify(expenses));
+      localStorage.setItem(`categories_${currentUser.uid}`, JSON.stringify(categories));
     }
+  }, [expenses, categories, currentUser]);
+
+  const handleAddExpense = (expense) => {
+    const newExpense = {
+      ...expense,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    setExpenses(prev => [...prev, newExpense]);
+    setFilteredExpenses(prev => [...prev, newExpense]);
   };
 
-  const handleRemoveExpense = async (id) => {
-    try {
-      await deleteDoc(doc(db, 'expenses', id));
-      setExpenses(prev => prev.filter(expense => expense.id !== id));
-      setFilteredExpenses(prev => prev.filter(expense => expense.id !== id));
-    } catch (error) {
-      console.error('Error removing expense:', error);
-    }
+  const handleRemoveExpense = (id) => {
+    setExpenses(prev => prev.filter(expense => expense.id !== id));
+    setFilteredExpenses(prev => prev.filter(expense => expense.id !== id));
   };
 
-  const handleUpdateExpense = async (updatedExpense) => {
-    try {
-      await updateDoc(doc(db, 'expenses', updatedExpense.id), {
-        ...updatedExpense,
-        userId: currentUser.uid
-      });
-      
-      setExpenses(prev => prev.map(expense => 
-        expense.id === updatedExpense.id ? { ...expense, ...updatedExpense } : expense
-      ));
-      setFilteredExpenses(prev => prev.map(expense => 
-        expense.id === updatedExpense.id ? { ...expense, ...updatedExpense } : expense
-      ));
-    } catch (error) {
-      console.error('Error updating expense:', error);
-    }
+  const handleUpdateExpense = (updatedExpense) => {
+    setExpenses(prev => prev.map(expense => 
+      expense.id === updatedExpense.id ? { ...expense, ...updatedExpense } : expense
+    ));
+    setFilteredExpenses(prev => prev.map(expense => 
+      expense.id === updatedExpense.id ? { ...expense, ...updatedExpense } : expense
+    ));
   };
 
-  const handleAddCategory = async (category) => {
-    try {
-      const categoryData = {
-        ...category,
-        userId: currentUser.uid
-      };
-      
-      const docRef = await addDoc(collection(db, 'categories'), categoryData);
-      setCategories(prev => [...prev, { id: docRef.id, ...categoryData }]);
-    } catch (error) {
-      console.error('Error adding category:', error);
-    }
+  const handleAddCategory = (category) => {
+    const newCategory = {
+      ...category,
+      id: Date.now().toString()
+    };
+    setCategories(prev => [...prev, newCategory]);
   };
 
-  const handleRemoveCategory = async (id) => {
-    try {
-      await deleteDoc(doc(db, 'categories', id));
-      setCategories(prev => prev.filter(category => category.id !== id));
-    } catch (error) {
-      console.error('Error removing category:', error);
-    }
+  const handleRemoveCategory = (id) => {
+    setCategories(prev => prev.filter(category => category.id !== id));
   };
 
   const handleFilterExpenses = (filters) => {
@@ -233,7 +197,6 @@ function AppContent() {
               />
             </div>
           </div>
-          
         </main>
         <footer className="relative z-10 bg-white/10 backdrop-blur-2xl rounded-2xl shadow-xl border border-white/20 px-8 py-4 mt-12">
           <p className="text-center text-indigo-200">
@@ -255,9 +218,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
