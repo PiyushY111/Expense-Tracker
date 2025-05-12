@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import Login from './components/Login';
 import ExpenseForm from './components/ExpenseForm';
@@ -15,11 +15,36 @@ function AppContent() {
   const [categories, setCategories] = useState([]);
   const [filteredExpenses, setFilteredExpenses] = useState([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
 
-    // Subscribe to expenses
+    // Load user data from Firestore
+    const loadUserData = async () => {
+      try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          setExpenses(userData.expenses || []);
+          setCategories(userData.categories || []);
+          setFilteredExpenses(userData.expenses || []);
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
+
+    // Subscribe to real-time updates
     const expensesQuery = query(
       collection(db, 'expenses'),
       where('userId', '==', currentUser.uid)
@@ -34,7 +59,6 @@ function AppContent() {
       setFilteredExpenses(expensesData);
     });
 
-    // Subscribe to categories
     const categoriesQuery = query(
       collection(db, 'categories'),
       where('userId', '==', currentUser.uid)
@@ -56,11 +80,18 @@ function AppContent() {
 
   const handleAddExpense = async (expense) => {
     try {
-      await addDoc(collection(db, 'expenses'), {
+      const expenseData = {
         ...expense,
         userId: currentUser.uid,
         createdAt: new Date().toISOString()
-      });
+      };
+      
+      // Add to Firestore
+      const docRef = await addDoc(collection(db, 'expenses'), expenseData);
+      
+      // Update local state
+      setExpenses(prev => [...prev, { id: docRef.id, ...expenseData }]);
+      setFilteredExpenses(prev => [...prev, { id: docRef.id, ...expenseData }]);
     } catch (error) {
       console.error('Error adding expense:', error);
     }
@@ -69,6 +100,8 @@ function AppContent() {
   const handleRemoveExpense = async (id) => {
     try {
       await deleteDoc(doc(db, 'expenses', id));
+      setExpenses(prev => prev.filter(expense => expense.id !== id));
+      setFilteredExpenses(prev => prev.filter(expense => expense.id !== id));
     } catch (error) {
       console.error('Error removing expense:', error);
     }
@@ -80,6 +113,13 @@ function AppContent() {
         ...updatedExpense,
         userId: currentUser.uid
       });
+      
+      setExpenses(prev => prev.map(expense => 
+        expense.id === updatedExpense.id ? { ...expense, ...updatedExpense } : expense
+      ));
+      setFilteredExpenses(prev => prev.map(expense => 
+        expense.id === updatedExpense.id ? { ...expense, ...updatedExpense } : expense
+      ));
     } catch (error) {
       console.error('Error updating expense:', error);
     }
@@ -87,10 +127,13 @@ function AppContent() {
 
   const handleAddCategory = async (category) => {
     try {
-      await addDoc(collection(db, 'categories'), {
+      const categoryData = {
         ...category,
         userId: currentUser.uid
-      });
+      };
+      
+      const docRef = await addDoc(collection(db, 'categories'), categoryData);
+      setCategories(prev => [...prev, { id: docRef.id, ...categoryData }]);
     } catch (error) {
       console.error('Error adding category:', error);
     }
@@ -99,6 +142,7 @@ function AppContent() {
   const handleRemoveCategory = async (id) => {
     try {
       await deleteDoc(doc(db, 'categories', id));
+      setCategories(prev => prev.filter(category => category.id !== id));
     } catch (error) {
       console.error('Error removing category:', error);
     }
@@ -126,6 +170,14 @@ function AppContent() {
     setIsDarkMode(!isDarkMode);
     document.body.classList.toggle('dark');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-blue-900 to-violet-800">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return <Login />;

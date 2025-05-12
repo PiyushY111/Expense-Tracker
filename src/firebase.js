@@ -1,16 +1,16 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBiuGE_0jnKVCcYX68i_B7740h2XRjlsN0",
-  authDomain: "expense-tracker-ccd62.firebaseapp.com",
-  projectId: "expense-tracker-ccd62",
-  storageBucket: "expense-tracker-ccd62.appspot.com",
-  messagingSenderId: "501140658641",
-  appId: "1:501140658641:web:395a95e880e726977be8f0",
-  measurementId: "G-5KTK9VVVKK"
+  apiKey: "AIzaSyAbpsxhUe3aGgN1DjVA5d1lD1FN3uhNxO8",
+  authDomain: "expense-tracker-39f90.firebaseapp.com",
+  projectId: "expense-tracker-39f90",
+  storageBucket: "expense-tracker-39f90.firebasestorage.app",
+  messagingSenderId: "235119290969",
+  appId: "1:235119290969:web:c6d74ddb5d53a07a325f48",
+  measurementId: "G-G9RZTBZ5KN"
 };
 
 // Initialize Firebase
@@ -22,6 +22,9 @@ const analytics = getAnalytics(app);
 // Get Auth and Firestore instances
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Initialize Google Auth Provider
+export const googleProvider = new GoogleAuthProvider();
 
 export { analytics };
 export default app; 
